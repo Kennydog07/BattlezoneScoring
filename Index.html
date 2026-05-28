@@ -188,7 +188,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px
 .empty{text-align:center;padding:28px;color:var(--muted);font-family:var(--fh);font-size:10px;letter-spacing:2px}
 
 
-
 /* TIMER */
 .timer-panel{background:rgba(255,98,0,.08);border:1px solid rgba(255,98,0,.25);
   border-radius:8px;padding:12px 14px;margin-bottom:14px;text-align:center}
@@ -198,6 +197,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px
 .timer-display.low{color:#f87171;text-shadow:0 0 18px rgba(248,113,113,.35)}
 .timer-controls{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap}
 .timer-controls .btn{font-family:var(--fh);font-size:9px;letter-spacing:1px;padding:8px 11px}
+.voice-panel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;margin-bottom:14px;text-align:center}
+.voice-status{font-family:var(--fh);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:8px}
+.voice-heard{font-size:13px;color:#aaa;margin-top:8px;min-height:18px}
 
 /* RESULTS */
 .res-actions{display:flex;gap:10px;margin-top:20px}
@@ -212,15 +215,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px
 
 ::-webkit-scrollbar{width:3px}
 ::-webkit-scrollbar-thumb{background:rgba(255,98,0,.3);border-radius:2px}
-
-/* VOICE SCORING */
-.voice-panel{background:var(--surface);border:1px solid var(--oglow);border-radius:6px;padding:10px 12px;margin-bottom:14px}
-.voice-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.voice-status{font-family:var(--fh);font-size:9px;letter-spacing:1px;color:var(--muted);flex:1;min-width:160px}
-.voice-status.on{color:#4ade80}
-.voice-status.err{color:#f87171}
-.voice-heard{margin-top:8px;font-size:12px;color:#aaa;letter-spacing:.5px}
-.voice-help{margin-top:6px;font-size:11px;color:var(--muted);line-height:1.35}
 </style>
 </head>
 <body>
@@ -250,7 +244,7 @@ const MODES=[
   {id:'koth',name:'King of the Hill',icon:'👑',desc:'Control the hill zone.',teams:false,vip:false,inf:false,tag:'Individual'},
 ];
 
-let S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,timerSeconds:600,timeLeft:600,timerRunning:false,timerId:null};
+let S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,timerSeconds:600,timeLeft:600,timerRunning:false,timerId:null,voiceListening:false,lastHeard:''};
 const mode=()=>MODES.find(m=>m.id===S.modeId);
 
 function render(){
@@ -283,18 +277,6 @@ function renderSetup(){
   </div>
   <div class="count-btns">
     ${Array.from({length:25},(_,i)=>i+1).map(n=>`<button class="cbtn${S.playerCount===n?' sel':''}" onclick="setCount(${n})">${n}</button>`).join('')}
-  </div>`;
-
-  h+=`<div class="timer-panel">
-    <div class="timer-label">COUNTDOWN TIMER</div>
-    <div class="timer-display${S.timeLeft<=60?' low':''}" id="timerDisplay">${fmtTime(S.timeLeft)}</div>
-    <div class="timer-controls">
-      <button class="btn btn-o btn-sm" onclick="startTimer()">▶ START</button>
-      <button class="btn btn-g btn-sm" onclick="pauseTimer()">⏸ PAUSE</button>
-      <button class="btn btn-g btn-sm" onclick="resetTimer()">↺ RESET</button>
-      <button class="btn btn-d btn-sm" onclick="addTime(-60)">-1 MIN</button>
-      <button class="btn btn-g btn-sm" onclick="addTime(60)">+1 MIN</button>
-    </div>
   </div>`;
 
   if(S.playerCount>0){
@@ -335,8 +317,6 @@ function renderPlaying(){
     <button class="btn btn-d btn-sm" onclick="endGame()">END GAME</button>
   </div>`;
 
-  h+=renderVoicePanel();
-
   h+=`<div class="timer-panel">
     <div class="timer-label">COUNTDOWN TIMER</div>
     <div class="timer-display${S.timeLeft<=60?' low':''}" id="timerDisplay">${fmtTime(S.timeLeft)}</div>
@@ -349,6 +329,11 @@ function renderPlaying(){
     </div>
   </div>`;
 
+  h+=`<div class="voice-panel">
+    <div class="voice-status" id="voiceStatus">${S.voiceListening?'VOICE LISTENING':'VOICE READY'}</div>
+    <button class="btn btn-g btn-sm" onclick="startVoice()">🎙️ LISTEN</button>
+    <div class="voice-heard" id="voiceHeard">${S.lastHeard||'Say: Blue 7 three points / Red 1 one point'}</div>
+  </div>`;
 
   if(m.teams){
     const aS=S.players.filter(p=>p.team==='Alpha').reduce((s,p)=>s+p.score,0);
@@ -403,7 +388,7 @@ function renderPlaying(){
     if(!S.log.length) h+=`<div class="empty">NO EVENTS YET</div>`;
     S.log.forEach(e=>{
       const col=e.pts>=0?'#4ade80':'#f87171';
-      h+=`<div class="lrow"><span class="lwho">${e.n?('P'+e.n):'⏱'}</span><span class="lact">${e.act}</span>
+      h+=`<div class="lrow"><span class="lwho">${e.n?("P"+e.n):"⏱"}</span><span class="lact">${e.act}</span>
         <span class="lpts" style="color:${col}">${e.pts>=0?'+':''}${e.pts}</span>
         <span class="ltime">${e.t}</span></div>`;
     });
@@ -468,103 +453,6 @@ function renderSheet(){
     <button class="btn btn-g btn-full" onclick="closeSheet()">CANCEL</button>`;
 }
 
-
-/* ── VOICE SCORING ── */
-let rec=null;
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-
-function renderVoicePanel(){
-  const supported=!!SR;
-  const st=!supported?'VOICE NOT SUPPORTED':S.voice?'LISTENING':'VOICE READY';
-  const cls=!supported?' err':S.voice?' on':'';
-  return `<div class="voice-panel">
-    <div class="voice-row">
-      <button class="btn ${S.voice?'btn-d':'btn-o'} btn-sm" onclick="toggleVoice()" ${supported?'':'disabled'}>${S.voice?'■ STOP VOICE':'🎙️ START VOICE'}</button>
-      <div class="voice-status${cls}" id="vstatus">${st}</div>
-    </div>
-    <div class="voice-heard" id="vheard">${S.heard?('Heard: '+S.heard):'Try: “red 2 3 points”, “blue 7 one point”, “player 5 minus 1”.'}</div>
-    <div class="voice-help">Works best in Chrome/Edge over HTTPS or localhost. Ray-Bans can be used as the phone/headset mic if connected.</div>
-  </div>`;
-}
-
-function toggleVoice(){
-  if(!SR){alert('Voice recognition is not supported in this browser. Try Chrome or Edge.');return;}
-  if(S.voice){stopVoice();return;}
-  startVoice();
-}
-function startVoice(){
-  if(!SR)return;
-  rec=new SR();
-  rec.lang='en-GB';
-  rec.continuous=true;
-  rec.interimResults=false;
-  rec.onstart=()=>{S.voice=true;render();};
-  rec.onresult=(e)=>{
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal){handleVoice(e.results[i][0].transcript);}
-    }
-  };
-  rec.onerror=(e)=>{S.heard='Voice error: '+e.error;S.voice=false;render();};
-  rec.onend=()=>{if(S.voice){try{rec.start();}catch(_){}}};
-  try{rec.start();}catch(e){S.heard='Could not start voice: '+e.message;S.voice=false;render();}
-}
-function stopVoice(){
-  S.voice=false;
-  if(rec){rec.onend=null;rec.stop();rec=null;}
-  render();
-}
-function wordToNumber(w){
-  const map={zero:0,oh:0,o:0,one:1,won:1,two:2,to:2,too:2,three:3,tree:3,four:4,for:4,five:5,six:6,seven:7,eight:8,ate:8,nine:9,ten:10};
-  return map[w]!==undefined?map[w]:null;
-}
-function parseVoice(text){
-  let t=text.toLowerCase().replace(/-/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
-  const original=t;
-  t=t.replace(/points?/g,' point').replace(/score/g,'').replace(/team/g,'').replace(/plus/g,' + ').replace(/minus/g,' - ');
-  const words=t.split(' ').filter(Boolean);
-  const nums=[];
-  for(const w of words){
-    if(/^\d+$/.test(w)) nums.push(Number(w));
-    else{const n=wordToNumber(w); if(n!==null) nums.push(n);}
-  }
-  const colour=words.includes('red')?'red':(words.includes('blue')?'blue':null);
-  let pts=null;
-  const sign=t.includes('-')||words.includes('penalty')?-1:1;
-  const pointIdx=words.indexOf('point');
-  if(pointIdx>0){
-    const prev=words[pointIdx-1];
-    pts=/^\d+$/.test(prev)?Number(prev):wordToNumber(prev);
-  }
-  if(pts===null && nums.length>=2) pts=nums[nums.length-1];
-  if(pts===null) pts=1;
-  pts=Math.abs(pts)*sign;
-  let playerNum=null;
-  if(colour){
-    const cidx=words.indexOf(colour);
-    for(let i=cidx+1;i<words.length;i++){
-      const n=/^\d+$/.test(words[i])?Number(words[i]):wordToNumber(words[i]);
-      if(n!==null){playerNum=n;break;}
-    }
-  }
-  if(playerNum===null && nums.length) playerNum=nums[0];
-  return {original,colour,playerNum,pts};
-}
-function handleVoice(text){
-  const cmd=parseVoice(text);
-  S.heard=cmd.original;
-  if(S.phase!=='playing'){render();return;}
-  const p=S.players.find(pl=>pl.n===cmd.playerNum);
-  if(!p){S.heard+=' → no player found';render();return;}
-  const m=mode();
-  if(cmd.colour && m&&m.teams){
-    const expected=cmd.colour==='blue'?'Alpha':'Bravo';
-    if(p.team!==expected){S.heard+=` → P${p.n} is ${p.team}, not ${cmd.colour}`;render();return;}
-  }
-  award(p.n,cmd.pts,'Voice score');
-  S.heard=`${cmd.colour?cmd.colour.toUpperCase()+' ':''}P${p.n} ${cmd.pts>=0?'+':''}${cmd.pts}`;
-  render();
-}
-
 /* ── ACTIONS ── */
 function selMode(id){S.modeId=id;if(S.playerCount>0)initPlayers();render();}
 function setCount(n){S.playerCount=n;initPlayers();render();}
@@ -582,8 +470,124 @@ function toggleZombie(n){const p=S.players.find(pl=>pl.n===n);if(p)p.isZ=!p.isZ;
 function toggleZombieIG(n){toggleZombie(n);S.sel=null;render();}
 function startGame(){if(!S.modeId||S.playerCount<2)return;S.phase='playing';S.view='grid';S.log=[];S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
 function endGame(){pauseTimer();S.phase='results';S.sel=null;render();}
-function newGame(){clearInterval(S.timerId);S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,timerSeconds:600,timeLeft:600,timerRunning:false,timerId:null};render();}
+function newGame(){clearInterval(S.timerId);S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,timerSeconds:600,timeLeft:600,timerRunning:false,timerId:null,voiceListening:false,lastHeard:''};render();}
 function rematch(){S.players.forEach(p=>{p.score=0;});S.log=[];S.sel=null;S.phase='playing';S.view='grid';S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
+
+function fmtTime(seconds){
+  seconds=Math.max(0,seconds);
+  const m=Math.floor(seconds/60).toString().padStart(2,'0');
+  const s=(seconds%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+function updateTimerDisplay(){
+  const el=document.getElementById('timerDisplay');
+  if(el){
+    el.textContent=fmtTime(S.timeLeft);
+    el.className='timer-display'+(S.timeLeft<=60?' low':'');
+  }
+}
+function startTimer(){
+  if(S.phase!=='playing'||S.timerRunning)return;
+  S.timerRunning=true;
+  clearInterval(S.timerId);
+  S.timerId=setInterval(()=>{
+    S.timeLeft=Math.max(0,S.timeLeft-1);
+    updateTimerDisplay();
+    if(S.timeLeft<=0){
+      pauseTimer();
+      const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      S.log.unshift({n:0,act:'Time expired',pts:0,t});
+      S.phase='results';
+      S.sel=null;
+      render();
+    }
+  },1000);
+}
+function pauseTimer(){
+  S.timerRunning=false;
+  clearInterval(S.timerId);
+  S.timerId=null;
+  updateTimerDisplay();
+}
+function resetTimer(){
+  pauseTimer();
+  S.timeLeft=S.timerSeconds;
+  updateTimerDisplay();
+}
+function addTime(seconds){
+  S.timeLeft=Math.max(0,S.timeLeft+seconds);
+  updateTimerDisplay();
+}
+function startVoice(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    S.lastHeard='Voice recognition needs Chrome or Edge.';
+    render();
+    return;
+  }
+  const rec=new SR();
+  rec.lang='en-GB';
+  rec.continuous=false;
+  rec.interimResults=false;
+  S.voiceListening=true;
+  S.lastHeard='Listening...';
+  render();
+  rec.onresult=(ev)=>{
+    const txt=ev.results[0][0].transcript;
+    S.lastHeard='Heard: '+txt;
+    parseVoiceCommand(txt);
+    S.voiceListening=false;
+    render();
+  };
+  rec.onerror=()=>{
+    S.voiceListening=false;
+    S.lastHeard='Could not hear command. Try again.';
+    render();
+  };
+  rec.onend=()=>{S.voiceListening=false;updateVoiceStatus();};
+  rec.start();
+}
+function updateVoiceStatus(){
+  const s=document.getElementById('voiceStatus');
+  const h=document.getElementById('voiceHeard');
+  if(s)s.textContent=S.voiceListening?'VOICE LISTENING':'VOICE READY';
+  if(h)h.textContent=S.lastHeard||'Say: Blue 7 three points / Red 1 one point';
+}
+function wordToNumber(w){
+  const map={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+  return map[w.toLowerCase()]!==undefined?map[w.toLowerCase()]:parseInt(w,10);
+}
+function parseVoiceCommand(text){
+  const t=text.toLowerCase().replace(/-/g,' ');
+  if(t.includes('start game')||t.includes('start timer')){startTimer();return;}
+  if(t.includes('pause game')||t.includes('pause timer')){pauseTimer();return;}
+  if(t.includes('reset timer')){resetTimer();return;}
+  if(t.includes('end game')){endGame();return;}
+
+  const parts=t.match(/\b(red|blue|alpha|bravo|player)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b.*?\b(minus|negative)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(point|points)?/);
+  if(!parts){S.lastHeard='Command not understood: '+text;return;}
+
+  const teamWord=parts[1];
+  const playerNo=wordToNumber(parts[2]);
+  let points=wordToNumber(parts[4]);
+  if(parts[3])points=-points;
+
+  const p=S.players.find(pl=>pl.n===playerNo);
+  if(!p){S.lastHeard='No player '+playerNo;return;}
+
+  const m=mode();
+  if(m&&m.teams){
+    const expectedTeam=(teamWord==='blue'||teamWord==='alpha')?'Alpha':(teamWord==='red'||teamWord==='bravo')?'Bravo':null;
+    if(expectedTeam&&p.team!==expectedTeam){
+      S.lastHeard='Player '+playerNo+' is not on '+teamWord;
+      return;
+    }
+  }
+
+  award(playerNo,points,points<0?'Voice penalty':'Voice score');
+  S.lastHeard='Added '+points+' to player '+playerNo;
+}
+
 function setView(v){S.view=v;render();}
 function selPlayer(n){S.sel=n;render();}
 function closeSheet(){S.sel=null;render();}

@@ -188,6 +188,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px
 .empty{text-align:center;padding:28px;color:var(--muted);font-family:var(--fh);font-size:10px;letter-spacing:2px}
 
 
+
 /* TIMER */
 .timer-panel{background:rgba(255,98,0,.08);border:1px solid rgba(255,98,0,.25);
   border-radius:8px;padding:12px 14px;margin-bottom:14px;text-align:center}
@@ -197,6 +198,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px
 .timer-display.low{color:#f87171;text-shadow:0 0 18px rgba(248,113,113,.35)}
 .timer-controls{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap}
 .timer-controls .btn{font-family:var(--fh);font-size:9px;letter-spacing:1px;padding:8px 11px}
+
 /* RESULTS */
 .res-actions{display:flex;gap:10px;margin-top:20px}
 .res-actions .btn{flex:1;justify-content:center;font-family:var(--fh);font-size:10px;letter-spacing:2px;padding:13px}
@@ -282,7 +284,20 @@ function renderSetup(){
   <div class="count-btns">
     ${Array.from({length:25},(_,i)=>i+1).map(n=>`<button class="cbtn${S.playerCount===n?' sel':''}" onclick="setCount(${n})">${n}</button>`).join('')}
   </div>`;
-if(S.playerCount>0){
+
+  h+=`<div class="timer-panel">
+    <div class="timer-label">COUNTDOWN TIMER</div>
+    <div class="timer-display${S.timeLeft<=60?' low':''}" id="timerDisplay">${fmtTime(S.timeLeft)}</div>
+    <div class="timer-controls">
+      <button class="btn btn-o btn-sm" onclick="startTimer()">▶ START</button>
+      <button class="btn btn-g btn-sm" onclick="pauseTimer()">⏸ PAUSE</button>
+      <button class="btn btn-g btn-sm" onclick="resetTimer()">↺ RESET</button>
+      <button class="btn btn-d btn-sm" onclick="addTime(-60)">-1 MIN</button>
+      <button class="btn btn-g btn-sm" onclick="addTime(60)">+1 MIN</button>
+    </div>
+  </div>`;
+
+  if(S.playerCount>0){
     if(m&&m.teams){
       h+=`<div class="sec">TEAMS</div>
       <div class="hint">Tap a number to swap team.</div>
@@ -321,6 +336,19 @@ function renderPlaying(){
   </div>`;
 
   h+=renderVoicePanel();
+
+  h+=`<div class="timer-panel">
+    <div class="timer-label">COUNTDOWN TIMER</div>
+    <div class="timer-display${S.timeLeft<=60?' low':''}" id="timerDisplay">${fmtTime(S.timeLeft)}</div>
+    <div class="timer-controls">
+      <button class="btn btn-o btn-sm" onclick="startTimer()">▶ START</button>
+      <button class="btn btn-g btn-sm" onclick="pauseTimer()">⏸ PAUSE</button>
+      <button class="btn btn-g btn-sm" onclick="resetTimer()">↺ RESET</button>
+      <button class="btn btn-d btn-sm" onclick="addTime(-60)">-1 MIN</button>
+      <button class="btn btn-g btn-sm" onclick="addTime(60)">+1 MIN</button>
+    </div>
+  </div>`;
+
 
   if(m.teams){
     const aS=S.players.filter(p=>p.team==='Alpha').reduce((s,p)=>s+p.score,0);
@@ -375,7 +403,7 @@ function renderPlaying(){
     if(!S.log.length) h+=`<div class="empty">NO EVENTS YET</div>`;
     S.log.forEach(e=>{
       const col=e.pts>=0?'#4ade80':'#f87171';
-      h+=`<div class="lrow"><span class="lwho">P${e.n}</span><span class="lact">${e.act}</span>
+      h+=`<div class="lrow"><span class="lwho">${e.n?('P'+e.n):'⏱'}</span><span class="lact">${e.act}</span>
         <span class="lpts" style="color:${col}">${e.pts>=0?'+':''}${e.pts}</span>
         <span class="ltime">${e.t}</span></div>`;
     });
@@ -554,48 +582,8 @@ function toggleZombie(n){const p=S.players.find(pl=>pl.n===n);if(p)p.isZ=!p.isZ;
 function toggleZombieIG(n){toggleZombie(n);S.sel=null;render();}
 function startGame(){if(!S.modeId||S.playerCount<2)return;S.phase='playing';S.view='grid';S.log=[];S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
 function endGame(){pauseTimer();S.phase='results';S.sel=null;render();}
-function newGame(){clearInterval(S.timerId);S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,timerSeconds:600,timeLeft:600,timerRunning:false,timerId:null};render();};render();}
-function rematch(){S.players.forEach(p=>{p.score=0;});S.log=[];S.sel=null;S.phase='playing';S.view='grid';S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();});S.log=[];S.sel=null;S.phase='playing';S.view='grid';S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
-
-
-function setTimer(seconds){S.timerSeconds=seconds;S.timeLeft=seconds;updateTimerDisplay();}
-function fmtTime(seconds){
-  seconds=Math.max(0,seconds);
-  const m=Math.floor(seconds/60).toString().padStart(2,'0');
-  const s=(seconds%60).toString().padStart(2,'0');
-  return `${m}:${s}`;
-}
-function updateTimerDisplay(){
-  const el=document.getElementById('timerDisplay');
-  if(el){
-    el.textContent=fmtTime(S.timeLeft);
-    el.className='timer-display'+(S.timeLeft<=60?' low':'');
-  }
-}
-function startTimer(){
-  if(S.phase!=='playing'||S.timerRunning)return;
-  S.timerRunning=true;
-  clearInterval(S.timerId);
-  S.timerId=setInterval(()=>{
-    S.timeLeft=Math.max(0,S.timeLeft-1);
-    updateTimerDisplay();
-    if(S.timeLeft<=0){
-      pauseTimer();
-      const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-      S.log.unshift({n:'⏱',act:'Time expired',pts:0,t});
-      S.phase='results';
-      S.sel=null;
-      render();
-    }
-  },1000);
-}
-function pauseTimer(){S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;updateTimerDisplay();}
-function resetTimer(){pauseTimer();S.timeLeft=S.timerSeconds;updateTimerDisplay();}
-function addTime(seconds){
-  S.timeLeft=Math.max(0,S.timeLeft+seconds);
-  updateTimerDisplay();
-}
-
+function newGame(){clearInterval(S.timerId);S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,timerSeconds:600,timeLeft:600,timerRunning:false,timerId:null};render();}
+function rematch(){S.players.forEach(p=>{p.score=0;});S.log=[];S.sel=null;S.phase='playing';S.view='grid';S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
 function setView(v){S.view=v;render();}
 function selPlayer(n){S.sel=n;render();}
 function closeSheet(){S.sel=null;render();}

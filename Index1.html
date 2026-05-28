@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NERF ARENA</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#07090d; --surface:#0e1117; --border:rgba(255,255,255,0.07);
+  --orange:#ff6200; --odim:rgba(255,98,0,0.15); --oglow:rgba(255,98,0,0.3);
+  --blue:#2d8aff; --bdim:rgba(45,138,255,0.12);
+  --red:#ff3b3b;  --rdim:rgba(255,59,59,0.12);
+  --text:#f2f2f2; --muted:#5a6070;
+  --fh:'Orbitron',monospace; --fb:'Barlow Condensed',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px;
+  -webkit-tap-highlight-color:transparent;user-select:none;overscroll-behavior:none}
+
+/* LAYOUT */
+.header{background:rgba(7,9,13,.95);border-bottom:1px solid var(--oglow);
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;backdrop-filter:blur(8px)}
+.logo{font-family:var(--fh);font-size:13px;letter-spacing:4px;color:var(--orange)}
+.badge{font-family:var(--fh);font-size:9px;letter-spacing:2px;
+  background:var(--odim);border:1px solid var(--oglow);color:var(--orange);padding:4px 10px;border-radius:2px}
+.phase-bar{display:flex;background:rgba(0,0,0,.5);border-bottom:1px solid var(--border)}
+.ptab{flex:1;text-align:center;padding:8px 4px;font-family:var(--fh);font-size:9px;
+  letter-spacing:2px;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s}
+.ptab.on{color:var(--orange);border-bottom-color:var(--orange)}
+.body{padding:14px;flex:1;max-width:700px;margin:0 auto;width:100%}
+.sec{font-family:var(--fh);font-size:9px;letter-spacing:3px;color:var(--orange);
+  margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sec::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--oglow),transparent)}
+
+/* MODES */
+.mode-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:22px}
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:14px 12px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.mcard:hover{border-color:var(--oglow);background:var(--odim)}
+.mcard.sel{border-color:var(--orange);background:var(--odim)}
+.mcard.sel::after{content:'✓';position:absolute;top:8px;right:10px;color:var(--orange);font-size:12px;font-weight:bold}
+.micon{font-size:22px;margin-bottom:6px}
+.mname{font-weight:800;font-size:14px;margin-bottom:3px}
+.mdesc{font-size:12px;color:#888;line-height:1.35}
+.mtag{display:inline-block;margin-top:6px;font-size:10px;letter-spacing:1px;
+  background:var(--odim);color:#fb923c;padding:2px 6px;border-radius:2px;font-family:var(--fh)}
+
+/* COUNT */
+.quick-counts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.qbtn{padding:7px 14px;border-radius:4px;background:var(--surface);border:1px solid var(--border);
+  color:var(--muted);font-family:var(--fh);font-size:10px;letter-spacing:1px;cursor:pointer;transition:all .15s}
+.qbtn:hover{border-color:var(--oglow);color:var(--text)}
+.count-btns{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:20px}
+.cbtn{width:38px;height:38px;border-radius:4px;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);font-family:var(--fh);font-size:12px;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.cbtn:hover{border-color:var(--oglow)}
+.cbtn.sel{background:var(--odim);border-color:var(--orange);color:var(--orange)}
+
+/* TEAM SETUP */
+.team-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tcol{background:var(--surface);border-radius:6px;padding:10px 12px;border:1px solid var(--border)}
+.tcol.alpha{border-color:rgba(45,138,255,.25)} .tcol.bravo{border-color:rgba(255,59,59,.25)}
+.tcol-title{font-family:var(--fh);font-size:10px;letter-spacing:2px;margin-bottom:8px}
+.tcol.alpha .tcol-title{color:var(--blue)} .tcol.bravo .tcol-title{color:var(--red)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{width:36px;height:30px;border-radius:3px;font-family:var(--fh);font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.chip.alpha{background:var(--bdim);border:1px solid rgba(45,138,255,.3);color:var(--blue)}
+.chip.bravo{background:var(--rdim);border:1px solid rgba(255,59,59,.3);color:var(--red)}
+
+/* BUTTONS */
+.btn{padding:10px 16px;border:none;border-radius:4px;cursor:pointer;
+  font-family:var(--fb);font-weight:700;font-size:15px;letter-spacing:1px;
+  transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:active{transform:scale(.96)}
+.btn-o{background:var(--orange);color:#000}
+.btn-o:hover{background:#ff7e2e}
+.btn-o:disabled{background:#2a2a2a;color:#555;cursor:not-allowed;transform:none}
+.btn-g{background:rgba(255,255,255,.05);color:#aaa;border:1px solid var(--border)}
+.btn-g:hover{background:rgba(255,255,255,.1);color:var(--text)}
+.btn-d{background:rgba(255,59,59,.15);color:#f87171;border:1px solid rgba(255,59,59,.3)}
+.btn-d:hover{background:rgba(255,59,59,.25)}
+.btn-full{width:100%;justify-content:center}
+.btn-sm{padding:6px 11px;font-size:13px}
+.btn-launch{width:100%;justify-content:center;padding:15px;font-size:15px;
+  letter-spacing:4px;font-family:var(--fh);margin-top:8px}
+.hint{font-size:12px;color:var(--muted);margin-bottom:12px;letter-spacing:.5px}
+.mb12{margin-bottom:12px}
+
+/* GAME HEADER */
+.ghd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;
+  padding:10px 14px;background:var(--odim);border:1px solid rgba(255,98,0,.2);border-radius:6px}
+.ghd-mode{font-family:var(--fh);font-size:11px;letter-spacing:2px;color:var(--orange)}
+.ghd-icon{font-size:26px}
+.ghd-count{font-family:var(--fh);font-size:9px;letter-spacing:1px;color:var(--muted);margin-top:2px}
+
+/* TEAM SCORES */
+.tstrip{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.tblock{border-radius:6px;padding:10px 14px;text-align:center}
+.tblock.alpha{background:var(--bdim);border:1px solid rgba(45,138,255,.3)}
+.tblock.bravo{background:var(--rdim);border:1px solid rgba(255,59,59,.3)}
+.tb-label{font-family:var(--fh);font-size:9px;letter-spacing:2px;opacity:.7;margin-bottom:4px}
+.tblock.alpha .tb-label{color:var(--blue)} .tblock.bravo .tb-label{color:var(--red)}
+.tb-score{font-family:var(--fh);font-size:30px;font-weight:900}
+.tblock.alpha .tb-score{color:var(--blue)} .tblock.bravo .tb-score{color:var(--red)}
+
+/* VIEW TABS */
+.vtabs{display:flex;gap:8px;margin-bottom:14px}
+.vtab{padding:7px 14px;border-radius:4px;background:var(--surface);border:1px solid var(--border);
+  color:var(--muted);font-family:var(--fh);font-size:9px;letter-spacing:2px;cursor:pointer;transition:all .15s}
+.vtab.on{background:var(--odim);border-color:var(--oglow);color:var(--orange)}
+
+/* PLAYER GRID */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:16px}
+.ptile{background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:10px 6px 8px;cursor:pointer;transition:all .15s;text-align:center;
+  position:relative;overflow:hidden}
+.ptile:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(255,98,0,.15)}
+.ptile:active{transform:scale(.95)}
+.ptile.alpha{border-color:rgba(45,138,255,.25)}
+.ptile.bravo{border-color:rgba(255,59,59,.25)}
+.ptile.zombie{border-color:rgba(0,230,118,.35);background:rgba(0,230,118,.05)}
+.ptile.vip{border-color:rgba(255,214,0,.5);background:rgba(255,214,0,.05)}
+@keyframes flash{0%{background:rgba(255,98,0,.4);border-color:var(--orange)}100%{background:var(--surface)}}
+.ptile.flash{animation:flash .5s ease forwards}
+.pnum{font-family:var(--fh);font-size:20px;font-weight:900;margin-bottom:3px}
+.pscore{font-family:var(--fh);font-size:16px;font-weight:700;color:var(--orange)}
+.pbadge{position:absolute;top:3px;right:4px;font-size:10px}
+.pbar{position:absolute;bottom:0;left:0;right:0;height:3px}
+
+/* SCORING OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);
+  z-index:200;display:flex;align-items:flex-end;justify-content:center;animation:fi .15s ease}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.sheet{width:100%;max-width:480px;background:#0e1117;
+  border:1px solid var(--oglow);border-bottom:none;
+  border-radius:14px 14px 0 0;padding:16px 16px 40px;animation:su .2s ease}
+@keyframes su{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+.drag{width:38px;height:4px;background:#2a2a2a;border-radius:2px;margin:0 auto 14px}
+.sh-title{font-family:var(--fh);font-size:32px;font-weight:900;text-align:center;margin-bottom:2px}
+.sh-sub{text-align:center;font-family:var(--fh);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:4px}
+.sh-score{font-family:var(--fh);font-size:48px;font-weight:900;color:var(--orange);
+  text-align:center;line-height:1;margin-bottom:20px}
+
+/* BIG SCORE BUTTONS */
+.score-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.sbtn{border-radius:8px;border:none;cursor:pointer;padding:18px 8px 14px;
+  transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.sbtn:active{transform:scale(.95)}
+.sbtn .spts{font-family:var(--fh);font-size:28px;font-weight:900;line-height:1}
+.sbtn .slabel{font-size:11px;font-weight:700;letter-spacing:.5px;opacity:.8;font-family:var(--fb)}
+.sbtn-1{background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.35);color:#4ade80}
+.sbtn-1:hover{background:rgba(74,222,128,.25)}
+.sbtn-3{background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.35);color:#fbbf24}
+.sbtn-3:hover{background:rgba(251,191,36,.25)}
+.sbtn-5{background:rgba(192,132,252,.15);border:1px solid rgba(192,132,252,.35);color:#c084fc}
+.sbtn-5:hover{background:rgba(192,132,252,.25)}
+.sbtn-m{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:#f87171}
+.sbtn-m:hover{background:rgba(248,113,113,.2)}
+
+/* RANKINGS */
+.rlist{display:flex;flex-direction:column;gap:6px}
+.rrow{display:flex;align-items:center;gap:12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:4px;padding:10px 14px;cursor:pointer}
+.rrow:hover{border-color:var(--oglow)}
+.rrow.gold{border-color:rgba(255,214,0,.4);background:rgba(255,214,0,.05)}
+.rrow.silver{border-color:rgba(192,192,192,.3);background:rgba(192,192,192,.04)}
+.rrow.bronze{border-color:rgba(205,127,50,.3);background:rgba(205,127,50,.04)}
+.rpos{font-family:var(--fh);font-size:11px;color:var(--muted);width:22px;text-align:center}
+.rnum{font-family:var(--fh);font-size:18px;font-weight:900;flex:1}
+.rteam{font-family:var(--fh);font-size:9px;letter-spacing:1px;font-weight:700}
+.rscore{font-family:var(--fh);font-size:22px;font-weight:900;color:var(--orange)}
+
+/* LOG */
+.log{background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:8px 12px;max-height:220px;overflow-y:auto}
+.lrow{display:flex;align-items:center;gap:8px;padding:5px 0;
+  border-bottom:1px solid var(--border);font-size:13px}
+.lrow:last-child{border-bottom:none}
+.lwho{font-family:var(--fh);font-size:11px;min-width:28px}
+.lact{flex:1;color:#888}
+.lpts{font-family:var(--fh);font-size:11px;font-weight:700}
+.ltime{font-family:var(--fh);font-size:9px;color:var(--muted)}
+.empty{text-align:center;padding:28px;color:var(--muted);font-family:var(--fh);font-size:10px;letter-spacing:2px}
+
+
+/* TIMER */
+.timer-panel{background:rgba(255,98,0,.08);border:1px solid rgba(255,98,0,.25);
+  border-radius:8px;padding:12px 14px;margin-bottom:14px;text-align:center}
+.timer-label{font-family:var(--fh);font-size:9px;letter-spacing:3px;color:var(--orange);margin-bottom:5px}
+.timer-display{font-family:var(--fh);font-size:42px;font-weight:900;letter-spacing:2px;line-height:1;
+  color:var(--text);text-shadow:0 0 18px rgba(255,98,0,.25)}
+.timer-display.low{color:#f87171;text-shadow:0 0 18px rgba(248,113,113,.35)}
+.timer-controls{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap}
+.timer-controls .btn{font-family:var(--fh);font-size:9px;letter-spacing:1px;padding:8px 11px}
+.timer-setup{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.timer-setup .qbtn.sel{background:var(--odim);border-color:var(--orange);color:var(--orange)}
+
+/* RESULTS */
+.res-actions{display:flex;gap:10px;margin-top:20px}
+.res-actions .btn{flex:1;justify-content:center;font-family:var(--fh);font-size:10px;letter-spacing:2px;padding:13px}
+
+/* ROLE CHIPS */
+.role-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.rchip{padding:5px 12px;border-radius:3px;font-family:var(--fh);font-size:10px;letter-spacing:1px;
+  cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--surface);color:var(--muted)}
+.rchip.zon{background:rgba(0,230,118,.12);border-color:rgba(0,230,118,.35);color:#00e676}
+.rchip.von{background:rgba(255,214,0,.12);border-color:rgba(255,214,0,.35);color:#ffd600}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:rgba(255,98,0,.3);border-radius:2px}
+
+/* VOICE SCORING */
+.voice-panel{background:var(--surface);border:1px solid var(--oglow);border-radius:6px;padding:10px 12px;margin-bottom:14px}
+.voice-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.voice-status{font-family:var(--fh);font-size:9px;letter-spacing:1px;color:var(--muted);flex:1;min-width:160px}
+.voice-status.on{color:#4ade80}
+.voice-status.err{color:#f87171}
+.voice-heard{margin-top:8px;font-size:12px;color:#aaa;letter-spacing:.5px}
+.voice-help{margin-top:6px;font-size:11px;color:var(--muted);line-height:1.35}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="logo">NERF ARENA</div>
+    <div class="badge" id="hbadge">SETUP</div>
+  </div>
+  <div class="phase-bar">
+    <div class="ptab on" id="pt0">SETUP</div>
+    <div class="ptab" id="pt1">GAME</div>
+    <div class="ptab" id="pt2">RESULTS</div>
+  </div>
+  <div class="body" id="body"></div>
+</div>
+<div class="overlay" id="ov" style="display:none" onclick="ovClick(event)">
+  <div class="sheet" id="sheet"></div>
+</div>
+<script>
+const MODES=[
+  {id:'ffa',name:'Free For All',icon:'🎯',desc:'Every player for themselves.',teams:false,vip:false,inf:false,tag:'Individual'},
+  {id:'tdm',name:'Team Deathmatch',icon:'⚔️',desc:'Alpha vs Bravo — eliminate opponents.',teams:true,vip:false,inf:false,tag:'Team + Individual'},
+  {id:'ctf',name:'Capture the Flag',icon:'🚩',desc:'Steal the enemy flag and return it.',teams:true,vip:false,inf:false,tag:'Team + Individual'},
+  {id:'dom',name:'Domination',icon:'🏴',desc:'Capture and hold zones.',teams:true,vip:false,inf:false,tag:'Team + Individual'},
+  {id:'vip',name:'VIP Protection',icon:'🛡️',desc:'Guard the VIP — or hunt them down.',teams:true,vip:true,inf:false,tag:'Team + Individual'},
+  {id:'inf',name:'Infection',icon:'🧟',desc:'Zombies infect humans. Last human wins.',teams:false,vip:false,inf:true,tag:'Individual'},
+  {id:'koth',name:'King of the Hill',icon:'👑',desc:'Control the hill zone.',teams:false,vip:false,inf:false,tag:'Individual'},
+];
+
+let S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,voice:false,heard:''};
+const mode=()=>MODES.find(m=>m.id===S.modeId);
+
+function render(){
+  const phases=['setup','playing','results'];
+  ['pt0','pt1','pt2'].forEach((id,i)=>{
+    document.getElementById(id).className='ptab'+(S.phase===phases[i]?' on':'');
+  });
+  const m=mode();
+  const hb=document.getElementById('hbadge');
+  hb.textContent=S.phase==='setup'?'SETUP':S.phase==='playing'?((m?m.icon+' '+m.name.toUpperCase():'GAME')):'RESULTS';
+  const body=document.getElementById('body');
+  body.innerHTML=S.phase==='setup'?renderSetup():S.phase==='playing'?renderPlaying():renderResults();
+  const ov=document.getElementById('ov');
+  if(S.sel!==null){ov.style.display='flex';document.getElementById('sheet').innerHTML=renderSheet();}
+  else{ov.style.display='none';}
+}
+
+/* ── SETUP ── */
+function renderSetup(){
+  const m=mode();
+  let h=`<div class="sec">GAME MODE</div><div class="mode-grid">`;
+  MODES.forEach(mo=>{
+    h+=`<div class="mcard${S.modeId===mo.id?' sel':''}" onclick="selMode('${mo.id}')">
+      <div class="micon">${mo.icon}</div><div class="mname">${mo.name}</div>
+      <div class="mdesc">${mo.desc}</div><div class="mtag">${mo.tag}</div></div>`;
+  });
+  h+=`</div><div class="sec">GAME TIMER</div>
+  <div class="hint">Choose the match length. The timer counts down during play.</div>
+  <div class="timer-setup">
+    ${[300,600,900,1200,1800].map(s=>`<button class="qbtn${S.timerSeconds===s?' sel':''}" onclick="setTimer(${s})">${Math.floor(s/60)} MIN</button>`).join('')}
+  </div>
+  <div class="sec">PLAYERS</div>
+  <div class="quick-counts">
+    ${[4,6,8,10,12,16,20,25].map(n=>`<button class="qbtn" onclick="setCount(${n})">${n}</button>`).join('')}
+  </div>
+  <div class="count-btns">
+    ${Array.from({length:25},(_,i)=>i+1).map(n=>`<button class="cbtn${S.playerCount===n?' sel':''}" onclick="setCount(${n})">${n}</button>`).join('')}
+  </div>`;
+
+  h+=`<div class="timer-panel">
+    <div class="timer-label">COUNTDOWN TIMER</div>
+    <div class="timer-display${S.timeLeft<=60?' low':''}" id="timerDisplay">${fmtTime(S.timeLeft)}</div>
+    <div class="timer-controls">
+      <button class="btn btn-o btn-sm" onclick="startTimer()">▶ START</button>
+      <button class="btn btn-g btn-sm" onclick="pauseTimer()">⏸ PAUSE</button>
+      <button class="btn btn-g btn-sm" onclick="resetTimer()">↺ RESET</button>
+      <button class="btn btn-d btn-sm" onclick="addTime(-60)">-1 MIN</button>
+      <button class="btn btn-g btn-sm" onclick="addTime(60)">+1 MIN</button>
+    </div>
+  </div>`;
+
+  if(S.playerCount>0){
+    if(m&&m.teams){
+      h+=`<div class="sec">TEAMS</div>
+      <div class="hint">Tap a number to swap team.</div>
+      <div class="team-grid">
+        <div class="tcol alpha"><div class="tcol-title">◀ ALPHA (${S.players.filter(p=>p.team==='Alpha').length})</div>
+          <div class="chips">${S.players.filter(p=>p.team==='Alpha').map(p=>`<div class="chip alpha" onclick="toggleTeam(${p.n})">${p.n}</div>`).join('')}</div></div>
+        <div class="tcol bravo"><div class="tcol-title">BRAVO ▶ (${S.players.filter(p=>p.team==='Bravo').length})</div>
+          <div class="chips">${S.players.filter(p=>p.team==='Bravo').map(p=>`<div class="chip bravo" onclick="toggleTeam(${p.n})">${p.n}</div>`).join('')}</div></div>
+      </div>
+      <button class="btn btn-g mb12" onclick="autoBalance()">⚡ Auto-balance</button>`;
+    }
+    if(m&&m.vip){
+      h+=`<div class="sec">VIP PLAYER</div>
+      <div class="hint">Tap to crown the VIP.</div>
+      <div class="role-row">${S.players.map(p=>`<div class="rchip${p.isVIP?' von':''}" onclick="toggleVIP(${p.n})">${p.isVIP?'👑 ':''}P${p.n}</div>`).join('')}</div>`;
+    }
+    if(m&&m.inf){
+      h+=`<div class="sec">STARTING ZOMBIES</div>
+      <div class="hint">Tap to mark starting zombies.</div>
+      <div class="role-row">${S.players.map(p=>`<div class="rchip${p.isZ?' zon':''}" onclick="toggleZombie(${p.n})">${p.isZ?'🧟 ':''}P${p.n}</div>`).join('')}</div>`;
+    }
+  }
+
+  h+=`<button class="btn btn-o btn-launch" onclick="startGame()" ${S.modeId&&S.playerCount>=2?'':'disabled'}>🚀 LAUNCH GAME</button>`;
+  return h;
+}
+
+/* ── PLAYING ── */
+function renderPlaying(){
+  const m=mode();
+  let h=`<div class="ghd">
+    <div><div class="ghd-mode">${m.name.toUpperCase()}</div>
+    <div class="ghd-count">${S.players.length} PLAYERS</div></div>
+    <div class="ghd-icon">${m.icon}</div>
+    <button class="btn btn-d btn-sm" onclick="endGame()">END GAME</button>
+  </div>`;
+
+  h+=renderVoicePanel();
+
+  if(m.teams){
+    const aS=S.players.filter(p=>p.team==='Alpha').reduce((s,p)=>s+p.score,0);
+    const bS=S.players.filter(p=>p.team==='Bravo').reduce((s,p)=>s+p.score,0);
+    h+=`<div class="tstrip">
+      <div class="tblock alpha"><div class="tb-label">◀ ALPHA</div><div class="tb-score">${aS}</div></div>
+      <div class="tblock bravo"><div class="tb-label">BRAVO ▶</div><div class="tb-score">${bS}</div></div>
+    </div>`;
+  }
+
+  h+=`<div class="vtabs">
+    <button class="vtab${S.view==='grid'?' on':''}" onclick="setView('grid')">PLAYERS</button>
+    <button class="vtab${S.view==='rank'?' on':''}" onclick="setView('rank')">RANKINGS</button>
+    <button class="vtab${S.view==='log'?' on':''}" onclick="setView('log')">LOG</button>
+  </div>`;
+
+  if(S.view==='grid'){
+    h+=`<div style="font-family:var(--fh);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:10px">TAP PLAYER TO SCORE</div>
+    <div class="pgrid">`;
+    S.players.forEach(p=>{
+      let cls='ptile';
+      if(m.teams) cls+=' '+p.team.toLowerCase();
+      if(p.isZ) cls+=' zombie';
+      if(p.isVIP) cls+=' vip';
+      if(S.animN===p.n) cls+=' flash';
+      const bar=m.teams?`<div class="pbar" style="background:${p.team==='Alpha'?'rgba(45,138,255,.6)':'rgba(255,59,59,.6)'}"></div>`:'';
+      h+=`<div class="${cls}" onclick="selPlayer(${p.n})">
+        ${p.isVIP?'<div class="pbadge">👑</div>':p.isZ?'<div class="pbadge">🧟</div>':''}
+        <div class="pnum">P${p.n}</div>
+        <div class="pscore">${p.score}</div>${bar}</div>`;
+    });
+    h+=`</div>`;
+  }
+
+  if(S.view==='rank'){
+    const sorted=[...S.players].sort((a,b)=>b.score-a.score);
+    h+=`<div class="rlist">`;
+    sorted.forEach((p,i)=>{
+      const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
+      const cls=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+      const tm=m.teams?`<span class="rteam" style="color:${p.team==='Alpha'?'#2d8aff':'#ff3b3b'}">${p.team.toUpperCase()}</span>`:'';
+      h+=`<div class="rrow ${cls}" onclick="selPlayer(${p.n});setView('grid')">
+        <div class="rpos">${medal}</div><div class="rnum">P${p.n}</div>${tm}
+        ${p.isZ?'<span style="font-size:14px">🧟</span>':''}${p.isVIP?'<span style="font-size:14px">👑</span>':''}
+        <div class="rscore">${p.score}</div></div>`;
+    });
+    h+=`</div>`;
+  }
+
+  if(S.view==='log'){
+    h+=`<div class="log">`;
+    if(!S.log.length) h+=`<div class="empty">NO EVENTS YET</div>`;
+    S.log.forEach(e=>{
+      const col=e.pts>=0?'#4ade80':'#f87171';
+      h+=`<div class="lrow"><span class="lwho">P${e.n}</span><span class="lact">${e.act}</span>
+        <span class="lpts" style="color:${col}">${e.pts>=0?'+':''}${e.pts}</span>
+        <span class="ltime">${e.t}</span></div>`;
+    });
+    h+=`</div>`;
+  }
+  return h;
+}
+
+/* ── RESULTS ── */
+function renderResults(){
+  const m=mode();
+  let h=`<div class="sec">FINAL STANDINGS</div>`;
+  if(m.teams){
+    const aS=S.players.filter(p=>p.team==='Alpha').reduce((s,p)=>s+p.score,0);
+    const bS=S.players.filter(p=>p.team==='Bravo').reduce((s,p)=>s+p.score,0);
+    h+=`<div class="tstrip" style="margin-bottom:20px">
+      <div class="tblock alpha" style="${aS>bS?'filter:brightness(1.3)':''}">
+        <div class="tb-label">${aS>bS?'🏆 ':''}ALPHA</div><div class="tb-score">${aS}</div></div>
+      <div class="tblock bravo" style="${bS>aS?'filter:brightness(1.3)':''}">
+        <div class="tb-label">${bS>aS?'🏆 ':''}BRAVO</div><div class="tb-score">${bS}</div></div>
+    </div>`;
+  }
+  const sorted=[...S.players].sort((a,b)=>b.score-a.score);
+  h+=`<div class="rlist">`;
+  sorted.forEach((p,i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
+    const cls=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const tm=m.teams?`<span class="rteam" style="color:${p.team==='Alpha'?'#2d8aff':'#ff3b3b'};margin-right:8px">${p.team}</span>`:'';
+    h+=`<div class="rrow ${cls}"><div class="rpos">${medal}</div><div class="rnum">P${p.n}</div>${tm}<div class="rscore">${p.score}</div></div>`;
+  });
+  h+=`</div><div class="res-actions">
+    <button class="btn btn-g" onclick="rematch()">🔁 REMATCH</button>
+    <button class="btn btn-o" onclick="newGame()">🚀 NEW GAME</button>
+  </div>`;
+  return h;
+}
+
+/* ── SCORING SHEET ── */
+function renderSheet(){
+  const p=S.players.find(pl=>pl.n===S.sel);
+  if(!p) return '';
+  const m=mode();
+  const tm=m.teams?`<div class="sh-sub" style="color:${p.team==='Alpha'?'#2d8aff':'#ff3b3b'}">TEAM ${p.team.toUpperCase()}</div>`:'';
+  const role=m.inf?`<div class="sh-sub">${p.isZ?'🧟 ZOMBIE':'🧍 HUMAN'}</div>`:(p.isVIP?`<div class="sh-sub" style="color:#ffd600">👑 VIP</div>`:'');
+  const infectToggle=m.inf?`<button class="btn btn-g btn-full mb12" onclick="toggleZombieIG(${p.n})">${p.isZ?'🧍 Switch to HUMAN':'🧟 Switch to ZOMBIE'}</button>`:'';
+
+  return `<div class="drag"></div>
+    <div class="sh-title">P${p.n}</div>${tm}${role}
+    <div class="sh-score">${p.score}</div>
+    <div class="score-btns">
+      <button class="sbtn sbtn-1" onclick="award(${p.n},1,'Hit')">
+        <span class="spts">+1</span><span class="slabel">HIT</span></button>
+      <button class="sbtn sbtn-3" onclick="award(${p.n},3,'Elimination')">
+        <span class="spts">+3</span><span class="slabel">ELIM</span></button>
+      <button class="sbtn sbtn-5" onclick="award(${p.n},5,'MVP')">
+        <span class="spts">+5</span><span class="slabel">MVP</span></button>
+    </div>
+    <button class="sbtn sbtn-m btn-full" style="flex-direction:row;justify-content:center;gap:10px;padding:12px;margin-bottom:12px" onclick="award(${p.n},-1,'Penalty')">
+      <span style="font-size:16px">🚫</span><span style="font-family:var(--fh);font-size:14px;font-weight:700">-1 PENALTY</span>
+    </button>
+    ${infectToggle}
+    <button class="btn btn-g btn-full" onclick="closeSheet()">CANCEL</button>`;
+}
+
+
+/* ── VOICE SCORING ── */
+let rec=null;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+function renderVoicePanel(){
+  const supported=!!SR;
+  const st=!supported?'VOICE NOT SUPPORTED':S.voice?'LISTENING':'VOICE READY';
+  const cls=!supported?' err':S.voice?' on':'';
+  return `<div class="voice-panel">
+    <div class="voice-row">
+      <button class="btn ${S.voice?'btn-d':'btn-o'} btn-sm" onclick="toggleVoice()" ${supported?'':'disabled'}>${S.voice?'■ STOP VOICE':'🎙️ START VOICE'}</button>
+      <div class="voice-status${cls}" id="vstatus">${st}</div>
+    </div>
+    <div class="voice-heard" id="vheard">${S.heard?('Heard: '+S.heard):'Try: “red 2 3 points”, “blue 7 one point”, “player 5 minus 1”.'}</div>
+    <div class="voice-help">Works best in Chrome/Edge over HTTPS or localhost. Ray-Bans can be used as the phone/headset mic if connected.</div>
+  </div>`;
+}
+
+function toggleVoice(){
+  if(!SR){alert('Voice recognition is not supported in this browser. Try Chrome or Edge.');return;}
+  if(S.voice){stopVoice();return;}
+  startVoice();
+}
+function startVoice(){
+  if(!SR)return;
+  rec=new SR();
+  rec.lang='en-GB';
+  rec.continuous=true;
+  rec.interimResults=false;
+  rec.onstart=()=>{S.voice=true;render();};
+  rec.onresult=(e)=>{
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal){handleVoice(e.results[i][0].transcript);}
+    }
+  };
+  rec.onerror=(e)=>{S.heard='Voice error: '+e.error;S.voice=false;render();};
+  rec.onend=()=>{if(S.voice){try{rec.start();}catch(_){}}};
+  try{rec.start();}catch(e){S.heard='Could not start voice: '+e.message;S.voice=false;render();}
+}
+function stopVoice(){
+  S.voice=false;
+  if(rec){rec.onend=null;rec.stop();rec=null;}
+  render();
+}
+function wordToNumber(w){
+  const map={zero:0,oh:0,o:0,one:1,won:1,two:2,to:2,too:2,three:3,tree:3,four:4,for:4,five:5,six:6,seven:7,eight:8,ate:8,nine:9,ten:10};
+  return map[w]!==undefined?map[w]:null;
+}
+function parseVoice(text){
+  let t=text.toLowerCase().replace(/-/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  const original=t;
+  t=t.replace(/points?/g,' point').replace(/score/g,'').replace(/team/g,'').replace(/plus/g,' + ').replace(/minus/g,' - ');
+  const words=t.split(' ').filter(Boolean);
+  const nums=[];
+  for(const w of words){
+    if(/^\d+$/.test(w)) nums.push(Number(w));
+    else{const n=wordToNumber(w); if(n!==null) nums.push(n);}
+  }
+  const colour=words.includes('red')?'red':(words.includes('blue')?'blue':null);
+  let pts=null;
+  const sign=t.includes('-')||words.includes('penalty')?-1:1;
+  const pointIdx=words.indexOf('point');
+  if(pointIdx>0){
+    const prev=words[pointIdx-1];
+    pts=/^\d+$/.test(prev)?Number(prev):wordToNumber(prev);
+  }
+  if(pts===null && nums.length>=2) pts=nums[nums.length-1];
+  if(pts===null) pts=1;
+  pts=Math.abs(pts)*sign;
+  let playerNum=null;
+  if(colour){
+    const cidx=words.indexOf(colour);
+    for(let i=cidx+1;i<words.length;i++){
+      const n=/^\d+$/.test(words[i])?Number(words[i]):wordToNumber(words[i]);
+      if(n!==null){playerNum=n;break;}
+    }
+  }
+  if(playerNum===null && nums.length) playerNum=nums[0];
+  return {original,colour,playerNum,pts};
+}
+function handleVoice(text){
+  const cmd=parseVoice(text);
+  S.heard=cmd.original;
+  if(S.phase!=='playing'){render();return;}
+  const p=S.players.find(pl=>pl.n===cmd.playerNum);
+  if(!p){S.heard+=' → no player found';render();return;}
+  const m=mode();
+  if(cmd.colour && m&&m.teams){
+    const expected=cmd.colour==='blue'?'Alpha':'Bravo';
+    if(p.team!==expected){S.heard+=` → P${p.n} is ${p.team}, not ${cmd.colour}`;render();return;}
+  }
+  award(p.n,cmd.pts,'Voice score');
+  S.heard=`${cmd.colour?cmd.colour.toUpperCase()+' ':''}P${p.n} ${cmd.pts>=0?'+':''}${cmd.pts}`;
+  render();
+}
+
+/* ── ACTIONS ── */
+function selMode(id){S.modeId=id;if(S.playerCount>0)initPlayers();render();}
+function setCount(n){S.playerCount=n;initPlayers();render();}
+function initPlayers(){
+  const m=mode();
+  S.players=Array.from({length:S.playerCount},(_,i)=>({
+    n:i+1,score:0,team:i%2===0?'Alpha':'Bravo',
+    isZ:m&&m.inf?i===0:false,isVIP:false
+  }));
+}
+function toggleTeam(n){const p=S.players.find(pl=>pl.n===n);if(p)p.team=p.team==='Alpha'?'Bravo':'Alpha';render();}
+function autoBalance(){S.players.forEach((p,i)=>{p.team=i%2===0?'Alpha':'Bravo';});render();}
+function toggleVIP(n){S.players.forEach(p=>{p.isVIP=p.n===n?!p.isVIP:false;});render();}
+function toggleZombie(n){const p=S.players.find(pl=>pl.n===n);if(p)p.isZ=!p.isZ;render();}
+function toggleZombieIG(n){toggleZombie(n);S.sel=null;render();}
+function startGame(){if(!S.modeId||S.playerCount<2)return;S.phase='playing';S.view='grid';S.log=[];S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
+function endGame(){pauseTimer();S.phase='results';S.sel=null;render();}
+function newGame(){S={phase:'setup',modeId:null,playerCount:0,players:[],log:[],view:'grid',sel:null,animN:null,voice:false,heard:''};render();}
+function rematch(){S.players.forEach(p=>{p.score=0;});S.log=[];S.sel=null;S.phase='playing';S.view='grid';S.timeLeft=S.timerSeconds;S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;render();}
+
+function setTimer(seconds){S.timerSeconds=seconds;S.timeLeft=seconds;render();}
+function fmtTime(seconds){
+  seconds=Math.max(0,seconds);
+  const m=Math.floor(seconds/60).toString().padStart(2,'0');
+  const s=(seconds%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+function startTimer(){
+  if(S.phase!=='playing'||S.timerRunning)return;
+  S.timerRunning=true;
+  clearInterval(S.timerId);
+  S.timerId=setInterval(()=>{
+    S.timeLeft=Math.max(0,S.timeLeft-1);
+    const el=document.getElementById('timerDisplay');
+    if(el){el.textContent=fmtTime(S.timeLeft);el.className='timer-display'+(S.timeLeft<=60?' low':'');}
+    if(S.timeLeft<=0){
+      pauseTimer();
+      const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      S.log.unshift({n:'⏱',act:'Time expired',pts:0,t});
+      S.phase='results';
+      S.sel=null;
+      render();
+    }
+  },1000);
+}
+function pauseTimer(){S.timerRunning=false;clearInterval(S.timerId);S.timerId=null;}
+function resetTimer(){pauseTimer();S.timeLeft=S.timerSeconds;render();}
+function addTime(seconds){S.timeLeft=Math.max(0,S.timeLeft+seconds);render();}
+
+function setView(v){S.view=v;render();}
+function selPlayer(n){S.sel=n;render();}
+function closeSheet(){S.sel=null;render();}
+function ovClick(e){if(e.target.id==='ov')closeSheet();}
+function award(n,pts,act){
+  const p=S.players.find(pl=>pl.n===n);
+  if(!p)return;
+  p.score=Math.max(0,p.score+pts);
+  const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  S.log.unshift({n,act,pts,t});
+  if(S.log.length>200)S.log.length=200;
+  S.animN=n;S.sel=null;render();
+  setTimeout(()=>{S.animN=null;if(S.phase==='playing'&&S.view==='grid')document.getElementById('body').innerHTML=renderPlaying();},600);
+}
+render();
+</script>
+</body>
+</html>
